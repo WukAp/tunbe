@@ -11,8 +11,6 @@ public class TunbeApplication {
 
 	public static void main(String[] args) {
 		var app = SpringApplication.run(TunbeApplication.class, args);
-		DataSource dataSource = app.getBean(DataSource.class);
-		System.out.println(dataSource);
 	}
 
 }
