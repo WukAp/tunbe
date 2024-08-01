@@ -18,14 +18,14 @@ import org.springframework.context.annotation.Lazy;
 public class Mapping {
     @Id
     @ManyToOne
-    @JoinColumn(name = "element_id")
+    @JoinColumn(name = "element_id1")
     @Lazy
     private Element element1;
 
 
     @Id
     @ManyToOne
-    @JoinColumn(name = "element_id")
+    @JoinColumn(name = "element_id2")
     @Lazy
     private Element element2;
 }
