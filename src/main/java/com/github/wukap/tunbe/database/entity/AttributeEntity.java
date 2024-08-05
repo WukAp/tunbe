@@ -16,7 +16,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @Getter
 @Setter
-public class Attribute {
+public class AttributeEntity {
     @Id
     @Column(name = "name")
     private String name;

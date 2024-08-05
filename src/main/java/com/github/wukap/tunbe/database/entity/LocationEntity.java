@@ -13,7 +13,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @Getter
 @Setter
-public class Location {
+public class LocationEntity {
     @Id
     @Column(name = "location_name")
     private String name;

@@ -1,11 +1,11 @@
 package com.github.wukap.tunbe.database.entity;
 
+import com.github.wukap.tunbe.database.keys.ElementAttributeId;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.context.annotation.Lazy;
 
 import java.sql.Date;
 
@@ -16,19 +16,12 @@ import java.sql.Date;
 @AllArgsConstructor
 @Getter
 @Setter
-public class ElementAttribute {
+public class ElementAttributeEntity {
     @Id
-    @ManyToOne
-    @JoinColumn(name = "element_id")
-    @Lazy
-    private Element element;
-
-    @Id
-    @ManyToOne
-    @JoinColumn(name = "name")
-    Attribute attribute;
+    ElementAttributeId id;
 
     private String value;
 
     private Date datetime;
+    private String Author;
 }

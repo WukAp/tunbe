@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Lazy;
 @AllArgsConstructor
 @Getter
 @Setter
-public class Element {
+public class ElementEntity {
     @Id
     @Column(name = "element_id")
     private String elementId;
@@ -21,7 +21,7 @@ public class Element {
     @ManyToOne
     @JoinColumn(name = "location_name")
     @Lazy
-    private Location location;
+    private LocationEntity location;
 
     @Column(name = "path")
     private String path;
@@ -30,41 +30,41 @@ public class Element {
     private String fileHashCode;
 
     @Column(name = "x")
-    private float x;
+    private double x;
 
     @Column(name = "y")
-    private float y;
+    private double y;
 
     @Column(name = "z")
-    private float z;
+    private double z;
 
     @Column(name = "quaternion_1")
-    private float quaternion1;
+    private double quaternion1;
 
     @Column(name = "quaternion_2")
-    private float quaternion2;
+    private double quaternion2;
 
     @Column(name = "quaternion_3")
-    private float quaternion3;
+    private double quaternion3;
 
     @Column(name = "quaternion_4")
-    private float quaternion4;
+    private double quaternion4;
 
     @Column(name = "bounding_box_min_x")
-    private float boundingBoxMinX;
+    private double boundingBoxMinX;
 
     @Column(name = "bounding_box_max_x")
-    private float boundingBoxMaxX;
+    private double boundingBoxMaxX;
 
     @Column(name = "bounding_box_min_y")
-    private float boundingBoxMinY;
+    private double boundingBoxMinY;
 
     @Column(name = "bounding_box_max_y")
-    private float boundingBoxMaxY;
+    private double boundingBoxMaxY;
 
     @Column(name = "bounding_box_min_z")
-    private float boundingBoxMinZ;
+    private double boundingBoxMinZ;
 
     @Column(name = "bounding_box_max_z")
-    private float boundingBoxMaxZ;
+    private double boundingBoxMaxZ;
 }
