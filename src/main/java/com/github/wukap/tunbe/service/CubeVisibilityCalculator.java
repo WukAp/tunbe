@@ -1,120 +1,132 @@
 package com.github.wukap.tunbe.service;
 
+import com.github.wukap.tunbe.database.repository.ElementChunkRepository;
+import com.github.wukap.tunbe.model.Camera;
+import com.github.wukap.tunbe.model.Frustum;
 import com.github.wukap.tunbe.model.Point;
-import com.github.wukap.tunbe.model.request.Coords;
-import lombok.Getter;
+import com.github.wukap.tunbe.model.request.RequestBodyObject;
+import com.github.wukap.tunbe.model.response.Chunk;
+import com.github.wukap.tunbe.model.response.Object3D;
+import com.github.wukap.tunbe.model.response.Position;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class CubeVisibilityCalculator {
-    private final double maxViewDistance;
     private final int cubeSize;
-    private final double lodPercentage1;
-    private final double lodPercentage2;
+    private final Camera camera;
+    private final ElementChunkRepository elementChunkRepository;
+    private final DataSource dataSource;
 
-    public CubeVisibilityCalculator(@Value("${camera.maxViewDistance}") double maxViewDistance, @Value("${camera.cubeSize}") int cubeSize, @Value("${camera.lodPercentage1}") double lodPercentage1, @Value("${camera.lodPercentage2}") double lodPercentage2) {
-        this.maxViewDistance = maxViewDistance;
+    private final String sqlQuery = "select el_ch.chunk_id, el_ch.element_id, ch.x as ch_x,  ch.y as ch_y,ch.z as ch_z, el.path, el.x, el.y,  el.z, el.quaternion_1, el.quaternion_2, el.quaternion_3, el.quaternion_4 " + "FROM element_chunk el_ch " + "JOIN chunk ch ON ch.chunk_id = el_ch.chunk_id " + "JOIN element el ON el.element_id = el_ch.element_id " + "WHERE ch.x >= ? AND ch.x < ? " + "AND ch.y >= ? AND ch.y < ? " + "AND ch.z >= ? AND ch.z < ?";
+
+    public CubeVisibilityCalculator(@Value("${camera.cubeSize}") int cubeSize, Camera camera, ElementChunkRepository elementChunkRepository, DataSource dataSource) {
         this.cubeSize = cubeSize;
-        this.lodPercentage1 = lodPercentage1;
-        this.lodPercentage2 = lodPercentage2;
+        this.camera = camera;
+        this.elementChunkRepository = elementChunkRepository;
+        this.dataSource = dataSource;
     }
 
-    public List<Cube> calculateVisibleCubes(Point characterPosition, Vector3D viewDirection, double verticalFOV, double aspectRatio) {
+    public List<Cube> calculateVisibleCubes(Frustum.BoundingBox boundingBox, Point characterPosition) {
+
+
         List<Cube> visibleCubes = new ArrayList<>();
-
-        double horizontalFOV = 2 * Math.atan(Math.tan(verticalFOV / 2) * aspectRatio);
-        double maxDistanceX = Math.tan(horizontalFOV / 2) * maxViewDistance;
-        double maxDistanceY = Math.tan(verticalFOV / 2) * maxViewDistance * aspectRatio;
-        double maxDistanceZ = Math.abs(Math.floor((characterPosition.z() + maxViewDistance) / cubeSize) - Math.ceil((characterPosition.z() - maxViewDistance) / cubeSize)) * cubeSize;
-
-        Frustum frustum = new Frustum(characterPosition, viewDirection, verticalFOV, horizontalFOV, maxViewDistance);
-
-        for (int x = (int) (Math.ceil((characterPosition.x() - maxDistanceX) / cubeSize) * cubeSize); x <= Math.floor((characterPosition.x() + maxDistanceX) / cubeSize) * cubeSize; x += cubeSize) {
-            for (int y = (int) (Math.ceil((characterPosition.y() - maxDistanceY) / cubeSize) * cubeSize); y <= Math.floor((characterPosition.y() + maxDistanceY) / cubeSize) * cubeSize; y += cubeSize) {
-                for (int z = (int) (Math.ceil((characterPosition.z() - maxDistanceZ) / cubeSize) * cubeSize); z <= Math.floor((characterPosition.z() + maxDistanceZ) / cubeSize) * cubeSize; z += cubeSize) {
-                    double distancePercentage = Math.sqrt(x * x + y * y + z * z) / maxViewDistance * 100;
-                    int lod = calculateLOD(distancePercentage, lodPercentage1, lodPercentage2);
-                    Cube cube = new Cube(x, y, z, cubeSize, lod);
-                    if (frustum.intersectsCube(cube)) {
-                        visibleCubes.add(cube);
-                    }
+        for (int x = (int) boundingBox.minX() / cubeSize; x <= (int) boundingBox.maxX() / cubeSize; x += cubeSize) {
+            for (int y = (int) boundingBox.minY() / cubeSize; y <= (int) boundingBox.maxY() / cubeSize; y += cubeSize) {
+                for (int z = (int) boundingBox.minZ() / cubeSize; z <= (int) boundingBox.maxZ() / cubeSize; z += cubeSize) {
+                    visibleCubes.add(getCube(x, y, z, characterPosition));
                 }
             }
         }
-
         return visibleCubes;
     }
 
-    private int calculateLOD(double distancePercentage, double lodPercentage1, double lodPercentage2) {
-        if (distancePercentage <= lodPercentage1) {
+    public Frustum.BoundingBox getBoundingBox(Point characterPosition, Vector3D axesX, Vector3D axesY, Vector3D axesZ, double verticalFOV, double aspectRatio) {
+        Frustum frustum = new Frustum(characterPosition, axesX, axesY, axesZ, verticalFOV, aspectRatio, camera.getMaxViewDistance());
+        return frustum.calculateBoundingBox();
+    }
+
+    private Cube getCube(int x, int y, int z, Point characterPosition) {
+        return new Cube(x, y, z, calculateLOD(characterPosition, x, y, z));
+    }
+
+    public int calculateLOD(Point characterPosition, double x, double y, double z) {
+        double distance = characterPosition.calculateDistance(x + cubeSize / 2.0, y + cubeSize / 2.0, z + cubeSize / 2.0);
+        if (distance <= camera.getMaxLod1()) {
             return 1;
-        } else if (distancePercentage > lodPercentage1 && distancePercentage <= lodPercentage2) {
+        } else if (distance <= camera.getMaxLod2()) {
             return 2;
         } else {
             return 3;
         }
     }
 
-    @Getter
-    public class Cube {
-        private int x;
-        private int y;
-        private int z;
-        private int size;
-        private int lod;
+    public List<Chunk> getObjects(RequestBodyObject requestBody) throws SQLException {
+        Frustum.BoundingBox boundingBox = getBoundingBox(requestBody.point(), requestBody.axesX().toVector(), requestBody.axesY().toVector(), requestBody.axesZ().toVector(), requestBody.verticalFov(), requestBody.ratio());
 
-        public Cube(int x, int y, int z, int size, int lod) {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.size = size;
-            this.lod = lod;
-        }
-    }
+        try (Connection connection = dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement(sqlQuery)) {
 
 
-    public class Frustum {
-        private Point position;
-        private Vector3D viewDirection;
-        private double verticalFOV;
-        private double horizontalFOV;
-        private double maxDistance;
+            preparedStatement.setDouble(1, boundingBox.minX());
+            preparedStatement.setDouble(2, boundingBox.maxX());
+            preparedStatement.setDouble(3, boundingBox.minY());
+            preparedStatement.setDouble(4, boundingBox.maxY());
+            preparedStatement.setDouble(5, boundingBox.minZ());
+            preparedStatement.setDouble(6, boundingBox.maxZ());
 
-        public Frustum(Point position, Vector3D viewDirection, double verticalFOV, double horizontalFOV, double maxDistance) {
-            this.position = position;
-            this.viewDirection = viewDirection;
-            this.verticalFOV = verticalFOV;
-            this.horizontalFOV = horizontalFOV;
-            this.maxDistance = maxDistance;
-        }
+            ResultSet resultSet = preparedStatement.executeQuery();
 
-        public boolean intersectsCube(Cube cube) {
-            double halfSize = cube.getSize() / 2.0;
-            double cubeCenterX = cube.getX() + halfSize;
-            double cubeCenterY = cube.getY() + halfSize;
-            double cubeCenterZ = cube.getZ() + halfSize;
+            Map<Chunk, List<Object3D>> chunks = new HashMap<>();
+            while (resultSet.next()) {
+                int chunkId = resultSet.getInt("chunk_id");
+                String elementId = resultSet.getString("element_id");
+                String path = resultSet.getString("path");
+                double x = resultSet.getDouble("x");
+                double y = resultSet.getDouble("y");
+                double z = resultSet.getDouble("z");
+                double chX = resultSet.getDouble("ch_x");
+                double chY = resultSet.getDouble("ch_y");
+                double chZ = resultSet.getDouble("ch_z");
+                double quaternion1 = resultSet.getDouble("quaternion_1");
+                double quaternion2 = resultSet.getDouble("quaternion_2");
+                double quaternion3 = resultSet.getDouble("quaternion_3");
+                double quaternion4 = resultSet.getDouble("quaternion_4");
+                int lod = calculateLOD(requestBody.point(), chX, chY, chZ);
 
-            // Check if cube center coordinates are aligned with cube size boundaries
-            if (cubeCenterX % cube.getSize() != 0 || cubeCenterY % cube.getSize() != 0 || cubeCenterZ % cube.getSize() != 0) {
-                return false; // Cube center not aligned with cube size boundaries
+                Chunk chunk = new Chunk(chunkId, lod, null);
+                Object3D object3D = new Object3D(path, elementId, new Position(x, y, z, quaternion1, quaternion2, quaternion3, quaternion4));
+                // Process each row of the ResultSet here
+                if (chunks.get(chunk) == null) {
+                    chunks.put(chunk, new ArrayList<>() {{
+                        add(object3D);
+                    }});
+                } else {
+                    chunks.get(chunk).add(object3D);
+                }
             }
-
-            double deltaX = cubeCenterX - position.x();
-            double deltaY = cubeCenterY - position.y();
-            double deltaZ = cubeCenterZ - position.z();
-
-            double distanceToCube = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
-
-            double angleVertical = Math.acos((deltaX * viewDirection.getX() + deltaY * viewDirection.getY() + deltaZ * viewDirection.getZ()) / (distanceToCube * viewDirection.getNorm()));
-
-            double angleHorizontal = Math.acos((deltaX * viewDirection.getY() - deltaY * viewDirection.getX()) / distanceToCube);
-
-            return distanceToCube <= maxDistance && angleVertical <= verticalFOV / 2 && angleHorizontal <= horizontalFOV / 2;
+            preparedStatement.close();
+            List<Chunk> chunksList = chunks.entrySet().stream().map(e -> {
+                e.getKey().setObjects(e.getValue());
+                return e.getKey();
+            }).toList();
+            return chunksList;
         }
     }
+
+
+    public record Cube(int x, int y, int z, int lod) {
+
+    }
+
 }

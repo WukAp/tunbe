@@ -1,11 +1,9 @@
 package com.github.wukap.tunbe.configuration;
 
 import com.zaxxer.hikari.HikariDataSource;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import javax.sql.DataSource;
 
@@ -27,6 +25,9 @@ public class DatabaseConfiguration {
         dataSource.setJdbcUrl(dbUrl);
         dataSource.setUsername(dbUsername);
         dataSource.setPassword(dbPassword);
+        dataSource.setMaximumPoolSize(10);
+        dataSource.setMinimumIdle(5);
+        dataSource.setConnectionTestQuery("SELECT 1");
         return dataSource;
     }
 }

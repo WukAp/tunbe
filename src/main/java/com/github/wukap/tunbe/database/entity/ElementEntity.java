@@ -5,7 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.context.annotation.Lazy;
 
 @Entity
 @Table(name = "element")
@@ -20,7 +19,6 @@ public class ElementEntity {
 
     @ManyToOne
     @JoinColumn(name = "location_name")
-    @Lazy
     private LocationEntity location;
 
     @Column(name = "path")

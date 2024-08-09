@@ -7,20 +7,19 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.context.annotation.Lazy;
 
 import java.io.Serializable;
 import java.util.Objects;
 
 @Embeddable
+@Getter
 @AllArgsConstructor
 @NoArgsConstructor
-@EqualsAndHashCode
 public class ElementChunkId implements Serializable {
     @ManyToOne
     @JoinColumn(name = "element_id")
-    @Lazy
     private ElementEntity element;
 
     @ManyToOne

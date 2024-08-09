@@ -15,7 +15,6 @@ import java.util.Objects;
 @Embeddable
 @AllArgsConstructor
 @NoArgsConstructor
-@EqualsAndHashCode
 public class MappingId implements Serializable {
     @ManyToOne
     @JoinColumn(name = "element_id1")
